@@ -1,1 +1,0 @@
-/usr/bin/c++   -g   CMakeFiles/cuda1.dir/main.cpp.o CMakeFiles/cuda1.dir/functions.cpp.o  -o cuda1 
