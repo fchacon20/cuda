@@ -10,5 +10,5 @@ for line in file:
 		line[i] = float(line[i])
 	deltaT *= 0.1
 	y = np.linspace(0, 10, round(10 / deltaT,1))
-	plt.plot(line, y, 'ro')
+	plt.plot(y, line, 'ro')
 	plt.show()

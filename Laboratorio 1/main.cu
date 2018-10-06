@@ -7,7 +7,6 @@
 #include <vector>
 #include <istream>
 #include <iterator>
-#include "functions.cuh"
 #include <stdio.h>
 #include <time.h>
 using namespace std;
