@@ -40,12 +40,12 @@ void secondCPU_GPU(int m) {
 		actualizadorCPU(soluciones, m, deltaT, deltaT*i);
 	t2 = clock();
 	duration = 1000 * (double)(t2 - t1) / CLOCKS_PER_SEC;
-	cout << "[CPU] Tamaño m = " << m << ": " << duration << " [ms]" << endl;
+	cout << "[CPU] Tamaï¿½o m = " << m << ": " << duration << " [ms]" << endl;
 
 	cudaEvent_t ct1, ct2;
 	float dt;
 	int grid_size = (int)ceil((float)m / 256);
-	int block_size(256);
+	int block_size = 256;
 	cudaEventCreate(&ct1);
 	cudaEventCreate(&ct2);
 	cudaEventRecord(ct1);
@@ -55,7 +55,7 @@ void secondCPU_GPU(int m) {
 	cudaEventSynchronize(ct2);
 	cudaEventElapsedTime(&dt, ct1, ct2);
 	cudaMemcpy(soluciones, devSoluciones, m * sizeof(float), cudaMemcpyDeviceToHost);
-	cout << "[GPU] Tamaño m = : " << m << ": " << dt << " [ms]" << endl;
+	cout << "[GPU] Tamaï¿½o m = : " << m << ": " << dt << " [ms]" << endl;
 
 	cudaFree(devSoluciones);
 	delete soluciones;
@@ -74,14 +74,14 @@ void fixedM() {
 	float * devSoluciones;
 	cudaMalloc(&devSoluciones, m * sizeof(float));
 
-	cudaEvent_t ct1, ct2;
+    cudaEvent_t ct1, ct2;
+    cudaEventCreate(&ct1);
+    cudaEventCreate(&ct2);
 	float dt;
 	for (int t = 0; t < 4; t++) {
 		cudaMemcpy(devSoluciones, soluciones, m * sizeof(float), cudaMemcpyHostToDevice);
 		int grid_size = (int)ceil((float)m / threads[t]);
-		int block_size(threads[t]);
-		cudaEventCreate(&ct1);
-		cudaEventCreate(&ct2);
+		int block_size = threads[t];
 		cudaEventRecord(ct1);
 		for (int i = 1; i < n; i++)
 			actualizadorGPU << <grid_size, block_size >> > (devSoluciones, m, deltaT, deltaT*i);
