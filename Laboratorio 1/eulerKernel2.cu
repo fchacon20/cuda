@@ -16,20 +16,19 @@ void actualizadorCPU(float * soluciones, int m, float deltaT, float tI) {
 
 __global__ void actualizadorGPU(float * devSoluciones, int m, float deltaT, float tI) {
 	int tId = threadIdx.x + blockIdx.x * blockDim.x;
-	if (tId < m) {
+	if (tId < m)
 		devSoluciones[tId] = devSoluciones[tId] + deltaT * (4 * (tI - deltaT) - devSoluciones[tId] + 3 + tId);
-	}
 }
 
 void secondCPU_GPU(int m) {
 	int n = 1000;
-	long duration;
-	float deltaT = 0.001;
+	double duration;
+	float deltaT = (float)0.001;
 	clock_t t1, t2;
 
 	float * soluciones = new float[m];
 	for (int j = 0; j < m; j++)
-		soluciones[j] = j;
+		soluciones[j] = (float)j;
 
 	float * devSoluciones;
 	cudaMalloc(&devSoluciones, m * sizeof(float));
@@ -40,12 +39,12 @@ void secondCPU_GPU(int m) {
 		actualizadorCPU(soluciones, m, deltaT, deltaT*i);
 	t2 = clock();
 	duration = 1000 * (double)(t2 - t1) / CLOCKS_PER_SEC;
-	cout << "[CPU] Tamaï¿½o m = " << m << ": " << duration << " [ms]" << endl;
+	cout << "[CPU] Tamaño m = " << m << ": " << duration << " [ms]" << endl;
 
 	cudaEvent_t ct1, ct2;
 	float dt;
 	int grid_size = (int)ceil((float)m / 256);
-	int block_size = 256;
+	int block_size(256);
 	cudaEventCreate(&ct1);
 	cudaEventCreate(&ct2);
 	cudaEventRecord(ct1);
@@ -55,55 +54,62 @@ void secondCPU_GPU(int m) {
 	cudaEventSynchronize(ct2);
 	cudaEventElapsedTime(&dt, ct1, ct2);
 	cudaMemcpy(soluciones, devSoluciones, m * sizeof(float), cudaMemcpyDeviceToHost);
-	cout << "[GPU] Tamaï¿½o m = : " << m << ": " << dt << " [ms]" << endl;
+	cout << "[GPU] Tamaño m = " << m << ": " << dt << " [ms]" << endl;
 
 	cudaFree(devSoluciones);
-	delete soluciones;
+	delete[] soluciones;
 }
 
-void fixedM() {
-	int n = 1000;
-	int m = 1e8;
-	float deltaT = 0.001;
-	int threads[4] = { 64, 128, 256, 512 };
+void fixedM(float* soluciones, float* devSoluciones, int nThreads, int m, int n) {
 
-	float * soluciones = new float[m];
-	for (int j = 0; j < m; j++)
-		soluciones[j] = j;
+	float deltaT = (float) 0.001;
 
-	float * devSoluciones;
-	cudaMalloc(&devSoluciones, m * sizeof(float));
-
-    cudaEvent_t ct1, ct2;
-    cudaEventCreate(&ct1);
-    cudaEventCreate(&ct2);
 	float dt;
-	for (int t = 0; t < 4; t++) {
-		cudaMemcpy(devSoluciones, soluciones, m * sizeof(float), cudaMemcpyHostToDevice);
-		int grid_size = (int)ceil((float)m / threads[t]);
-		int block_size = threads[t];
-		cudaEventRecord(ct1);
-		for (int i = 1; i < n; i++)
-			actualizadorGPU << <grid_size, block_size >> > (devSoluciones, m, deltaT, deltaT*i);
-		cudaEventRecord(ct2);
-		cudaEventSynchronize(ct2);
-		cudaEventElapsedTime(&dt, ct1, ct2);
-		cudaMemcpy(soluciones, devSoluciones, m * sizeof(float), cudaMemcpyDeviceToHost);
-		cout << "[GPU] Hebras = : " << threads[t] << ": " << dt << " [ms]" << endl;
-	}
+	cudaEvent_t ct1, ct2;
+	cudaEventCreate(&ct1);
+	cudaEventCreate(&ct2);
 
-	cudaFree(devSoluciones);
-	delete soluciones;
+	int grid_size = (int)ceil((float)m / nThreads);
+	int block_size(nThreads);
+	cudaEventRecord(ct1);
+	for (int i = 1; i < n; i++)
+		actualizadorGPU << <grid_size, block_size >> > (devSoluciones, m, deltaT, deltaT*i);
+	cudaEventRecord(ct2);
+	cudaEventSynchronize(ct2);
+	cudaEventElapsedTime(&dt, ct1, ct2);
+	cout << "[GPU] Hebras = " << nThreads << ": " << dt << " [ms]" << endl;
+
+	//cudaMemcpy(soluciones, devSoluciones, m * sizeof(float), cudaMemcpyDeviceToHost);
+
 }
 
 int main() {
 
-	//secondCPU_GPU(10000);
-	//secondCPU_GPU(100000);
-	//secondCPU_GPU(1000000);
-	//secondCPU_GPU(10000000);
-	//secondCPU_GPU(100000000);
-	fixedM();
+	secondCPU_GPU((int)1e4);
+	secondCPU_GPU((int)1e5);
+	secondCPU_GPU((int)1e6);
+	secondCPU_GPU((int)1e7);
+	secondCPU_GPU((int)1e8);
 
+	int n = 1000;
+	int m = (int) 1e8;
+
+	float * soluciones = new float[m];
+	for (int j = 0; j < m; j++)
+		soluciones[j] = (float)j;
+
+	float * devSoluciones;
+	cudaMalloc(&devSoluciones, m * sizeof(float));
+	cudaMemcpy(devSoluciones, soluciones, m * sizeof(float), cudaMemcpyHostToDevice);
+
+	cout << "-----------" << endl;
+
+	fixedM(soluciones, devSoluciones, 64,  m, n);
+	fixedM(soluciones, devSoluciones, 128, m, n);
+	fixedM(soluciones, devSoluciones, 256, m, n);
+	fixedM(soluciones, devSoluciones, 512, m, n);
+
+	cudaFree(devSoluciones);
+	delete[] soluciones;
 	return 0;
 }
