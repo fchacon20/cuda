@@ -63,6 +63,62 @@ float* eulerMethodCPU(int t0, float y0, float deltaT) {
 	return y;
 }
 
+void __global__ calculoGPU2(float t0, float y0, float deltaT, int n, const float * __restrict__ sums_GPU, float * soluciones_GPU) {
+	int tId = threadIdx.x + blockIdx.x * blockDim.x;
+
+	if (tId == 0)
+		soluciones_GPU[0] = y0;
+	else if (tId < n) {
+		soluciones_GPU[tId] = (sums_GPU[tId] * deltaT) + y0;
+	}
+}
+
+void eulerMethodHybrid(int t0, float y0, float deltaT) {
+	int n = int(10 / deltaT);
+	int block_size = 256;
+	int grid_size = (int)ceil((float)n / block_size);
+	float *sums = new float[n];
+	float *sums_GPU;
+	float *soluciones = new float[n];
+	float *soluciones_GPU;
+	clock_t t1, t2;
+	cudaEvent_t ct1, ct2;
+	long duration;
+	float duration_GPU;
+
+
+	t1 = clock();
+
+	sums[0] = -1;
+	int i;
+	for (i = 0; i < n; i++)
+		sums[i + 1] = sums[i] + powf(E, -1 * (i - 1) * deltaT);
+
+	t2 = clock();
+
+	duration = duration = 1000 * (double)(t2 - t1) / CLOCKS_PER_SEC;
+
+
+	cudaMalloc(&soluciones_GPU, n * sizeof(float));
+	cudaMalloc(&sums_GPU, n * sizeof(float));
+	cudaEventCreate(&ct1);
+	cudaEventCreate(&ct2);
+
+	cudaEventRecord(ct1);
+	cudaMemcpy(sums_GPU, sums, n * sizeof(float), cudaMemcpyHostToDevice);
+	calculoGPU2 << <grid_size, block_size >> > (t0, y0, deltaT, n, sums_GPU, soluciones_GPU);
+	cudaEventRecord(ct2);
+
+	cudaEventSynchronize(ct2);
+	cudaEventElapsedTime(&duration_GPU, ct1, ct2);
+	cudaMemcpy(soluciones, soluciones_GPU, n * sizeof(float), cudaMemcpyDeviceToHost);
+	cudaFree(sums_GPU);
+	cudaFree(soluciones_GPU);
+
+	cout << "[Hybrid] DeltaT = " << deltaT << ": " << duration + duration_GPU << " [ms]" << endl;
+
+}
+
 
 int main() {
 
@@ -86,6 +142,15 @@ int main() {
 	eulerMethodGPU(0, -1, deltaT[1]);
 	eulerMethodGPU(0, -1, deltaT[2]);
 	eulerMethodGPU(0, -1, deltaT[3]);
+
+	cout << "---------------" << endl;
+
+	eulerMethodHybrid(0, -1, 0.1);
+	eulerMethodHybrid(0, -1, 0.01);
+	eulerMethodHybrid(0, -1, 0.001);
+	eulerMethodHybrid(0, -1, 0.0001);
+	eulerMethodHybrid(0, -1, 0.00001);
+	eulerMethodHybrid(0, -1, 0.000001);
 
 	delete[] y;
 	return 0;
