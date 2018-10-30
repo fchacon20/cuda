@@ -29,6 +29,7 @@ int main(){
 		cout << "Cargando linea " << count << " de 5." << endl;
 		istringstream iss(line);
 		lines.push_back(vector<string>(istream_iterator<string> { iss }, istream_iterator<string>()));
+		count++;
 	}
 
 	file.close();
