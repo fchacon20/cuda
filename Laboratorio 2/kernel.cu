@@ -11,19 +11,42 @@
 
 using namespace std;
 
-__global__ void addKernel(int *c, const int *a, const int *b)
-{
+__global__ void addKernel(int *c, const int *a, const int *b){
     int i = threadIdx.x;
     c[i] = a[i] + b[i];
 }
 
+int * SoAGen(vector<vector<string> > lines, int N, int M){
+	int * SoA_array = new int [N*M*4];
+	int contador = 0;
+	for (int i = 1; i <= 4; i++){
+		for (int j = 0; j < N*M; j++){
+			SoA_array[contador] = stoi(lines[i][j]);
+			contador++;
+		}
+	}
+	return SoA_array;
+}
+
+int * AoSGen(vector<vector<string> > lines, int N, int M){
+	int * AoS_array = new int [N*M*4];
+	int contador = 0;
+	for (int i = 0; i < N*M; i++){
+		for (int j = 1; j <= 4; j++){
+			AoS_array[contador] = stoi(lines[j][i]);
+			contador++;
+		}
+	}
+	return AoS_array;
+}
+
 int main(){
 
-	ifstream file("./initial.txt");
+	ifstream file("initial.txt");
 	clock_t begin = clock();
 	int N, M, count = 1;
 	string line;
-	vector<vector<string>> lines;
+	vector<vector<string> > lines;
 
 	while (getline(file, line)) {
 		cout << "Cargando linea " << count << " de 5." << endl;
@@ -37,17 +60,8 @@ int main(){
 	N = stoi(lines[0][0]);
 	M = stoi(lines[0][1]);
 
-	int* F0 = new int[N*M];
-	int* F1 = new int[N*M];
-	int* F2 = new int[N*M];
-	int* F3 = new int[N*M];
-
-	for (int i = 0; i < N*M; ++i) {
-		F0[i] = stoi(lines[1][i]);
-		F0[i] = stoi(lines[2][i]);
-		F0[i] = stoi(lines[3][i]);
-		F0[i] = stoi(lines[4][i]);
-	}
+	int * SoA = SoAGen(lines, N, M);
+	int * AoS = AoSGen(lines, N, M);
 
 	clock_t end = clock();
 	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
@@ -55,10 +69,8 @@ int main(){
 
 	cout << "Programa terminado" << endl;
 
-	delete[] F0;
-	delete[] F1;
-	delete[] F2;
-	delete[] F3;
+	delete[] AoS;
+	delete[] SoA;
 
     return 0;
 }
