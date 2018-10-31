@@ -11,9 +11,32 @@
 
 using namespace std;
 
-__global__ void addKernel(int *c, const int *a, const int *b){
-    int i = threadIdx.x;
-    c[i] = a[i] + b[i];
+__global__ void thirdCollision(int *devF, int N, int M){
+    int tId = threadIdx.x + blockIdx.x * blockDim.x;
+
+	if (tId < N*M) {
+		int f0, f1, f2, f3;
+		f3 = devF[tId] / 8;
+		devF[tId] = devF[tId] % 8;
+		f2 = devF[tId] / 4;
+		devF[tId] = devF[tId] % 4;
+		f1 = devF[tId] / 2;
+		devF[tId] = devF[tId] % 2;
+		f0 = devF[tId];
+
+		// Collisions
+		if (f0 == 1 && f1 == 0 && f2 == 1 && f3 == 0) {
+			f0 = f2 = 0;
+			f1 = f3 = 1;
+		} else if (f0 == 0 && f1 == 1 && f2 == 0 && f3 == 1) {
+			f0 = f2 = 1;
+			f1 = f3 = 0;
+		}
+
+		//Streaming
+
+	}
+
 }
 
 int * SoAGen(vector<vector<string> > lines, int N, int M){
@@ -40,6 +63,17 @@ int * AoSGen(vector<vector<string> > lines, int N, int M){
 	return AoS_array;
 }
 
+int* thirdVersion(vector<vector<string>> lines, int N, int M) {
+	int* F = new int[N*M];
+	for (int i = 0; i < N*M; ++i) {
+		F[i] = stoi(lines[1][i]) * 1 +
+			stoi(lines[2][i]) * 2 +
+			stoi(lines[3][i]) * 4 +
+			stoi(lines[4][i]) * 8;
+	}
+	return F;
+}
+
 int main(){
 
 	ifstream file("initial.txt");
@@ -47,6 +81,8 @@ int main(){
 	int N, M, count = 1;
 	string line;
 	vector<vector<string> > lines;
+	cudaEvent_t ct1, ct2;
+	float durationGPU;
 
 	while (getline(file, line)) {
 		cout << "Cargando linea " << count << " de 5." << endl;
@@ -62,6 +98,7 @@ int main(){
 
 	int * SoA = SoAGen(lines, N, M);
 	int * AoS = AoSGen(lines, N, M);
+	int* F = thirdVersion(lines, N, M);
 
 	clock_t end = clock();
 	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
@@ -71,6 +108,7 @@ int main(){
 
 	delete[] AoS;
 	delete[] SoA;
+	delete[] F;
 
     return 0;
 }
