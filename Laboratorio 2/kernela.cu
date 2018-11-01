@@ -161,6 +161,8 @@ int main(){
 	vector<vector<string> > lines;
 	cudaEvent_t ct1, ct2;
 	float durationGPU;
+	int particlesAoS = 0;
+	int particlesSoA = 0;
 	int blockSize = 256;
 	int gridSize;
 	int * devSoa;
@@ -192,9 +194,15 @@ int main(){
 	cudaEventCreate(&ct1);
 	cudaEventCreate(&ct2);
 	cudaEventRecord(ct1);
-
-	for(int i = 0; i < 2; i++){
-		cudaMemset(&devF1, 0, N*M*4 * sizeof(int));
+	
+	for (int i = 0; i < N*M*4; i++){
+		particlesSoA += SoA[i];
+		particlesAoS += AoS[i];
+	}
+	cout << "En SoA hay " << particlesSoA << " particulas y en AoS hay " << particlesAoS << " particulas" << endl;
+	
+	for(int i = 0; i < 1000; i++){
+		cudaMemset(devF1, 0, N*M*4 * sizeof(int));
 		timeStepSoA << <gridSize, blockSize >> > (devSoa, devF1, N, M);
 		cudaDeviceSynchronize();
 		FinalStep << <gridSize, blockSize >> > (devSoa, devF1, N, M);
@@ -207,11 +215,11 @@ int main(){
 	cudaMemcpy(SoA, devSoa, N*M*4 * sizeof(int), cudaMemcpyDeviceToHost);
 
 	cout << "Tiempo de ejecucion SoA: " << durationGPU << "[ms]" << endl;
-
+	
 	cudaEventRecord(ct1);
 
-	for(int i = 0; i < 2; i++){
-		cudaMemset(&devF1, 0, N*M*4 * sizeof(int));
+	for(int i = 0; i < 1000; i++){
+		cudaMemset(devF1, 0, N*M*4 * sizeof(int));
 		timeStepAoS << <gridSize, blockSize >> > (devAos, devF1, N, M);
 		cudaDeviceSynchronize();
 		FinalStep << <gridSize, blockSize >> > (devAos, devF1, N, M);
@@ -224,6 +232,14 @@ int main(){
 
 	cout << "Tiempo de ejecucion AoS: " << durationGPU << "[ms]" << endl;
 
+	particlesSoA = 0;
+	particlesAoS = 0;
+	for (int i = 0; i < N*M*4; i++){
+		particlesSoA += SoA[i];
+		particlesAoS += AoS[i];
+	}
+	cout << "En SoA hay " << particlesSoA << " particulas y en AoS hay " << particlesAoS << " particulas" << endl;
+	
 	cout << "Programa terminado" << endl;
 
 	delete[] AoS;
