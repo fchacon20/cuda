@@ -13,6 +13,8 @@ using namespace std;
 
 __global__ void thirdCollision(int *devF, int* devF1, int N, int M){
     int tId = threadIdx.x + blockIdx.x * blockDim.x;
+	//if (tId == 0)
+	//	printf("devF1[0]: %d\n", devF1[0]);
 
 	if (tId < N*M) {
 		int f0, f1, f2, f3;
@@ -64,6 +66,14 @@ __global__ void thirdCollision(int *devF, int* devF1, int N, int M){
 				atomicAdd(&devF1[tId + M], 8);
 		}
 	}
+}
+
+__global__ void print(int*devF, int N, int M) {
+	for (int i = 0; i < N*M; i++)
+	{
+		printf("%d ", devF[i]);
+	}
+	printf("\n");
 }
 
 __global__ void thirdFinalStep (int* devF, int* devF1, int N, int M) {
@@ -136,9 +146,9 @@ int main(){
 	cudaEventCreate(&ct1);
 	cudaEventCreate(&ct2);
 	cudaEventRecord(ct1);
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < 1000; i++)
 	{
-		cudaMemset(&devF1, 0, N*M * sizeof(int));
+		cudaMemset(devF1, 0, N*M * sizeof(int));
 		thirdCollision << <gridSize, blockSize >> > (devF, devF1, N, M);
 		cudaDeviceSynchronize();
 		thirdFinalStep << <gridSize, blockSize >> > (devF, devF1, N, M);
