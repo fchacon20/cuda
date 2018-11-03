@@ -157,7 +157,7 @@ int main(){
 	int particlesAoS = 0;
 	int particlesSoA = 0;
 	int blockSize = 256;
-	int gridSize;
+	int gridSizeFinal, gridSizeStep;
 	int * devSoa;
 	int * devAos;
 	int * devF1;
@@ -175,8 +175,8 @@ int main(){
 
 	N = stoi(lines[0][0]);
 	M = stoi(lines[0][1]);
-	gridSize = (int)ceil((float)N*M*4 / blockSize);
-
+	gridSizeFinal = (int)ceil((float)N*M*4 / blockSize);
+	gridSizeStep = (int)ceil((float)N*M / blockSize);
 	SoA = SoAGen(lines, N, M);
 	AoS = AoSGen(lines, N, M);
 	cudaMalloc(&devSoa, N*M*4 * sizeof(int));
@@ -196,9 +196,9 @@ int main(){
 	
 	for(int i = 0; i < 1000; i++){
 		cudaMemset(devF1, 0, N*M*4 * sizeof(int));
-		timeStepSoA << <gridSize, blockSize >> > (devSoa, devF1, N, M);
+		timeStepSoA << <gridSizeStep, blockSize >> > (devSoa, devF1, N, M);
 		cudaDeviceSynchronize();
-		FinalStep << <gridSize, blockSize >> > (devSoa, devF1, N, M);
+		FinalStep << <gridSizeFinal, blockSize >> > (devSoa, devF1, N, M);
 	}
 
 	cudaEventRecord(ct2);
@@ -213,9 +213,9 @@ int main(){
 
 	for(int i = 0; i < 1000; i++){
 		cudaMemset(devF1, 0, N*M*4 * sizeof(int));
-		timeStepAoS << <gridSize, blockSize >> > (devAos, devF1, N, M);
+		timeStepAoS << <gridSizeStep, blockSize >> > (devAos, devF1, N, M);
 		cudaDeviceSynchronize();
-		FinalStep << <gridSize, blockSize >> > (devAos, devF1, N, M);
+		FinalStep << <gridSizeFinal, blockSize >> > (devAos, devF1, N, M);
 	}
 	cudaEventRecord(ct2);
 	cudaEventSynchronize(ct2);
