@@ -188,6 +188,6 @@ int main(){
 	cudaDeviceSynchronize();
 
 	cout << "Programa terminado" << endl;
-
+	
     return 0;
 }

@@ -34,31 +34,26 @@ __global__ void timeStepSoA(int *devF, int *devF1, int N, int M){
 			f1 = 0;
 			f3 = 0;
 		}
-
 		//Streaming
 		if(f0 == 1){
-			devF[tId] = 0;
 			if(y == M-1)
 				devF1[x*M] = 1;
 			else
 				devF1[x*M + y + 1] = 1;
 		}
 		if(f1 == 1){  
-			devF[tId + N*M] = 0;
 			if(x == 0)
 				devF1[(N-1)*M + y + N*M] = 1;
 			else
 				devF1[(x-1)*M + y + N*M] = 1;
 		}
 		if(f2 == 1){
-			devF[tId + N*M*2] = 0;
 			if(y == 0)
 				devF1[x*M + M-1 + N*M*2] = 1;
 			else
 				devF1[x*M + y - 1 + N*M*2] = 1;
 		}
 		if(f3 == 1){
-			devF[tId + N*M*3] = 0;
 			if(x == N-1)
 				devF1[y + N*M*3] = 1;
 			else
@@ -70,14 +65,16 @@ __global__ void timeStepSoA(int *devF, int *devF1, int N, int M){
 __global__ void timeStepAoS(int *devF, int *devF1, int N, int M){
 	int tId = threadIdx.x + blockIdx.x * blockDim.x;
 	
-	if(tId < N*M*4 && tId % 4 == 0){
+	if(tId < N*M){
 		int f0, f1, f2, f3, x, y;
-		f0 = tId;
-		f1 = tId + 1;
-		f2 = tId + 2;
-		f3 = tId + 3;
-		x = (tId / 4) / M;
-		y = (tId / 4) % M;
+		x = tId / M;
+		y = tId % M;
+		tId = tId * 4;
+		f0 = devF[tId];
+		f1 = devF[tId + 1];
+		f2 = devF[tId + 2];
+		f3 = devF[tId + 3];
+		
 		// Collisions
 		if (f0 == 1 && f1 == 0 && f2 == 1 && f3 == 0) {
 			f0 = 0;
@@ -92,28 +89,24 @@ __global__ void timeStepAoS(int *devF, int *devF1, int N, int M){
 		}
 		// Streaming
 		if(f0 == 1){
-			devF[tId] = 0;
 			if(y == M-1)
 				devF1[x*M*4] = 1;
 			else
 				devF1[(x*M + y + 1)*4] = 1;
 		}
 		if(f1 == 1){  
-			devF[tId + 1] = 0;
 			if(x == 0)
 				devF1[((N-1)*M + y)*4 + 1] = 1;
 			else
-				devF1[((x-1)*N + y)*4 + 1] = 1;
+				devF1[((x-1)*M + y)*4 + 1] = 1;
 		}
 		if(f2 == 1){
-			devF[tId + 2] = 0;
 			if(y == 0)
 				devF1[(x*M + M-1)*4 + 2] = 1;
 			else
 				devF1[(x*M + y - 1)*4 + 2] = 1;
 		}
 		if(f3 == 1){
-			devF[tId + 3] = 0;
 			if(x == N-1)
 				devF1[y*4 + 3] = 1;
 			else
@@ -125,8 +118,8 @@ __global__ void timeStepAoS(int *devF, int *devF1, int N, int M){
 __global__ void FinalStep (int* devF, int* devF1, int N, int M) {
 	int tId = threadIdx.x + blockIdx.x * blockDim.x;
 
-	if (tId < N*M*4 && devF1[tId] == 1)
-		devF[tId] = 1;
+	if (tId < N*M*4)
+		devF[tId] = devF1[tId];
 }
 
 int * SoAGen(vector<vector<string> > lines, int N, int M){
@@ -182,7 +175,7 @@ int main(){
 
 	N = stoi(lines[0][0]);
 	M = stoi(lines[0][1]);
-	gridSize = (int)ceil((float)N*M / blockSize);
+	gridSize = (int)ceil((float)N*M*4 / blockSize);
 
 	SoA = SoAGen(lines, N, M);
 	AoS = AoSGen(lines, N, M);
@@ -228,7 +221,7 @@ int main(){
 	cudaEventSynchronize(ct2);
 	cudaEventElapsedTime(&durationGPU, ct1, ct2);
 
-	cudaMemcpy(AoS, devAos, N*M*4 * sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(AoS, devAos, (N*M*4 * sizeof(int)), cudaMemcpyDeviceToHost);
 
 	cout << "Tiempo de ejecucion AoS: " << durationGPU << "[ms]" << endl;
 
