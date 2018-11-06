@@ -11,7 +11,7 @@
 
 using namespace std;
 
-__global__ void thirdCollision(int *devF, int* devF1, int N, int M) {
+__global__ void thirdIfWall(int *devF, int* devF1, int N, int M) {
 	int tId = threadIdx.x + blockIdx.x * blockDim.x;
 	//if (tId == 0)
 	//	printf("devF1[0]: %d\n", devF1[0]);
@@ -66,6 +66,116 @@ __global__ void thirdCollision(int *devF, int* devF1, int N, int M) {
 				atomicAdd(&devF1[tId], 2);
 			else
 				atomicAdd(&devF1[tId + M], 8);
+		}
+	}
+}
+
+__global__ void thirdTerWall(int *devF, int* devF1, int N, int M) {
+	int tId = threadIdx.x + blockIdx.x * blockDim.x;
+	//if (tId == 0)
+	//	printf("devF1[0]: %d\n", devF1[0]);
+
+	if (tId < N*M) {
+		int f0, f1, f2, f3, indice, suma;
+		f3 = devF[tId] / 8;
+		devF[tId] = devF[tId] % 8;
+		f2 = devF[tId] / 4;
+		devF[tId] = devF[tId] % 4;
+		f1 = devF[tId] / 2;
+		devF[tId] = devF[tId] % 2;
+		f0 = devF[tId];
+
+		// Collisions
+		if (tId >= M && tId < (N*M - M) && tId % M && (tId + 1) % M) {
+			if (f0 == 1 && f1 == 0 && f2 == 1 && f3 == 0) {
+				f0 = 0;
+				f2 = 0;
+				f1 = 1;
+				f3 = 1;
+			}
+			else if (f0 == 0 && f1 == 1 && f2 == 0 && f3 == 1) {
+				f0 = 1;
+				f2 = 1;
+				f1 = 0;
+				f3 = 0;
+			}
+		}
+
+		//Streaming
+		if (f0 == 1) {
+			indice = ((tId + 1) % M == 0) ? tId : tId + 1;
+			suma = ((tId + 1) % M == 0) ? 4 : 1;
+			atomicAdd(&devF1[indice], suma);
+		}
+		if (f1 == 1) {
+			indice = (tId < M) ? tId : tId - M;
+			suma = (tId < M) ? 8 : 2;
+			atomicAdd(&devF1[indice], suma);
+		}
+		if (f2 == 1) {
+			indice = ((tId % M) == 0) ? tId : tId - 1;
+			suma = ((tId % M) == 0) ? 1 : 4;
+			atomicAdd(&devF1[indice], suma);
+		}
+		if (f3 == 1) {
+			indice = (tId >= (N*M - M)) ? tId : tId + M;
+			suma = (tId >= (N*M - M)) ? 2 : 8;
+			atomicAdd(&devF1[indice], suma);
+		}
+	}
+}
+
+__global__ void thirdBoolWall(int *devF, int* devF1, int N, int M) {
+	int tId = threadIdx.x + blockIdx.x * blockDim.x;
+	//if (tId == 0)
+	//	printf("devF1[0]: %d\n", devF1[0]);
+
+	if (tId < N*M) {
+		int f0, f1, f2, f3, indice, suma;
+		f3 = devF[tId] / 8;
+		devF[tId] = devF[tId] % 8;
+		f2 = devF[tId] / 4;
+		devF[tId] = devF[tId] % 4;
+		f1 = devF[tId] / 2;
+		devF[tId] = devF[tId] % 2;
+		f0 = devF[tId];
+
+		// Collisions
+		if (tId >= M && tId < (N*M - M) && tId % M && (tId + 1) % M) {
+			if (f0 == 1 && f1 == 0 && f2 == 1 && f3 == 0) {
+				f0 = 0;
+				f2 = 0;
+				f1 = 1;
+				f3 = 1;
+			}
+			else if (f0 == 0 && f1 == 1 && f2 == 0 && f3 == 1) {
+				f0 = 1;
+				f2 = 1;
+				f1 = 0;
+				f3 = 0;
+			}
+		}
+
+		//Streaming
+		if (f0 == 1) {
+			indice = ((tId + 1) % M == 0) * tId + (1 - ((tId + 1) % M == 0)) * (tId + 1);
+			suma = ((tId + 1) % M == 0) * 4 + (1 - ((tId + 1) % M == 0)) * 1;
+			atomicAdd(&devF1[indice], suma);
+		}
+		if (f1 == 1) {
+			indice = (tId < M) * tId + (1 - (tId < M)) * (tId - M);
+			suma = (tId < M) * 8 + (1 - (tId < M)) * 2;
+			atomicAdd(&devF1[indice], suma);
+		}
+		if (f2 == 1) {
+			indice = ((tId % M) == 0) * tId + (1 - ((tId % M) == 0)) * (tId - 1);
+			suma = ((tId % M) == 0) * 1 + (1 - ((tId % M) == 0)) * 4;
+			atomicAdd(&devF1[indice], suma);
+		}
+		if (f3 == 1) {
+			indice = (tId >= (N*M - M)) * tId + (1 - (tId >= (N*M - M))) * (tId + M);
+			suma = (tId >= (N*M - M)) * 2 + (1 - (tId >= (N*M - M))) * 8;
+			atomicAdd(&devF1[indice], suma);
 		}
 	}
 }
@@ -151,7 +261,7 @@ int main() {
 	for (int i = 0; i < 1; i++)
 	{
 		cudaMemset(devF1, 0, N*M * sizeof(int));
-		thirdCollision << <gridSize, blockSize >> > (devF, devF1, N, M);
+		thirdIfWall << <gridSize, blockSize >> > (devF, devF1, N, M);
 		cudaDeviceSynchronize();
 		thirdFinalStep << <gridSize, blockSize >> > (devF, devF1, N, M);
 	}
