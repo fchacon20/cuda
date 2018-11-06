@@ -45,25 +45,25 @@ __global__ void thirdIfWall(int *devF, int* devF1, int N, int M) {
 		//Streaming
 		if (f0 == 1) {
 			if ((tId + 1) % M == 0)
-				atomicAdd(&devF1[tId], 4);
+				atomicAdd(&devF1[tId - 1], 4);
 			else
 				atomicAdd(&devF1[tId + 1], 1);
 		}
 		if (f1 == 1) {
 			if (tId < M)
-				atomicAdd(&devF1[tId], 8);
+				atomicAdd(&devF1[tId + M], 8);
 			else
 				atomicAdd(&devF1[tId - M], 2);
 		}
 		if (f2 == 1) {
 			if ((tId % M) == 0)
-				atomicAdd(&devF1[tId], 1);
+				atomicAdd(&devF1[tId + 1], 1);
 			else
 				atomicAdd(&devF1[tId - 1], 4);
 		}
 		if (f3 == 1) {
 			if (tId >= (N*M - M))
-				atomicAdd(&devF1[tId], 2);
+				atomicAdd(&devF1[tId - M], 2);
 			else
 				atomicAdd(&devF1[tId + M], 8);
 		}
@@ -103,22 +103,22 @@ __global__ void thirdTerWall(int *devF, int* devF1, int N, int M) {
 
 		//Streaming
 		if (f0 == 1) {
-			indice = ((tId + 1) % M == 0) ? tId : tId + 1;
+			indice = ((tId + 1) % M == 0) ? tId - 1 : tId + 1;
 			suma = ((tId + 1) % M == 0) ? 4 : 1;
 			atomicAdd(&devF1[indice], suma);
 		}
 		if (f1 == 1) {
-			indice = (tId < M) ? tId : tId - M;
+			indice = (tId < M) ? tId + M: tId - M;
 			suma = (tId < M) ? 8 : 2;
 			atomicAdd(&devF1[indice], suma);
 		}
 		if (f2 == 1) {
-			indice = ((tId % M) == 0) ? tId : tId - 1;
+			indice = ((tId % M) == 0) ? tId + 1: tId - 1;
 			suma = ((tId % M) == 0) ? 1 : 4;
 			atomicAdd(&devF1[indice], suma);
 		}
 		if (f3 == 1) {
-			indice = (tId >= (N*M - M)) ? tId : tId + M;
+			indice = (tId >= (N*M - M)) ? tId - M: tId + M;
 			suma = (tId >= (N*M - M)) ? 2 : 8;
 			atomicAdd(&devF1[indice], suma);
 		}
@@ -158,22 +158,22 @@ __global__ void thirdBoolWall(int *devF, int* devF1, int N, int M) {
 
 		//Streaming
 		if (f0 == 1) {
-			indice = ((tId + 1) % M == 0) * tId + (1 - ((tId + 1) % M == 0)) * (tId + 1);
+			indice = ((tId + 1) % M == 0) * (tId - 1) + (1 - ((tId + 1) % M == 0)) * (tId + 1);
 			suma = ((tId + 1) % M == 0) * 4 + (1 - ((tId + 1) % M == 0)) * 1;
 			atomicAdd(&devF1[indice], suma);
 		}
 		if (f1 == 1) {
-			indice = (tId < M) * tId + (1 - (tId < M)) * (tId - M);
+			indice = (tId < M) * (tId + M) + (1 - (tId < M)) * (tId - M);
 			suma = (tId < M) * 8 + (1 - (tId < M)) * 2;
 			atomicAdd(&devF1[indice], suma);
 		}
 		if (f2 == 1) {
-			indice = ((tId % M) == 0) * tId + (1 - ((tId % M) == 0)) * (tId - 1);
+			indice = ((tId % M) == 0) * (tId + 1) + (1 - ((tId % M) == 0)) * (tId - 1);
 			suma = ((tId % M) == 0) * 1 + (1 - ((tId % M) == 0)) * 4;
 			atomicAdd(&devF1[indice], suma);
 		}
 		if (f3 == 1) {
-			indice = (tId >= (N*M - M)) * tId + (1 - (tId >= (N*M - M))) * (tId + M);
+			indice = (tId >= (N*M - M)) * (tId - M) + (1 - (tId >= (N*M - M))) * (tId + M);
 			suma = (tId >= (N*M - M)) * 2 + (1 - (tId >= (N*M - M))) * 8;
 			atomicAdd(&devF1[indice], suma);
 		}
@@ -231,9 +231,25 @@ int main() {
 	int* F = new int[N*M];
 	thirdVersion(lines, F, N, M);
 
+	int* devF;
+	int* devF1;
+	cudaMalloc(&devF, N*M * sizeof(int));
+	cudaMalloc(&devF1, N*M * sizeof(int));
+	cudaMemcpy(devF, F, N*M * sizeof(int), cudaMemcpyHostToDevice);
 
-	for (int i = 0; i < N*M; i++)
-	{
+	int blockSize = 256;
+	int gridSize = (int)ceil((float)N*M / blockSize);
+	
+	// Primera iteracion
+	for(int i = 0; i < 2; i ++){
+		cudaMemset(devF1, 0, N*M * sizeof(int));
+		thirdBoolWall << <gridSize, blockSize >> > (devF, devF1, N, M);
+		cudaDeviceSynchronize();
+		thirdFinalStep << <gridSize, blockSize >> > (devF, devF1, N, M);
+	}
+	cudaMemcpy(F, devF, N*M * sizeof(int), cudaMemcpyDeviceToHost);
+
+	for (int i = 0; i < N*M; i++){
 		int f0, f1, f2, f3;
 		f3 = F[i] / 8;
 		f2 = (F[i] % 8) / 4;
@@ -246,22 +262,27 @@ int main() {
 
 	cout << "Cantidad de particulas: " << particles << endl;
 
-	int* devF;
-	int* devF1;
-	cudaMalloc(&devF, N*M * sizeof(int));
-	cudaMalloc(&devF1, N*M * sizeof(int));
-	cudaMemcpy(devF, F, N*M * sizeof(int), cudaMemcpyHostToDevice);
-
-	int blockSize = 256;
-	int gridSize = (int)ceil((float)N*M / blockSize);
-
 	cudaEventCreate(&ct1);
 	cudaEventCreate(&ct2);
 	cudaEventRecord(ct1);
-	for (int i = 0; i < 1; i++)
+	for (int i = 0; i < 1000; i++)
 	{
 		cudaMemset(devF1, 0, N*M * sizeof(int));
 		thirdIfWall << <gridSize, blockSize >> > (devF, devF1, N, M);
+		cudaDeviceSynchronize();
+		thirdFinalStep << <gridSize, blockSize >> > (devF, devF1, N, M);
+	}
+	
+	cudaEventRecord(ct2);
+	cudaEventSynchronize(ct2);
+	cudaEventElapsedTime(&durationGPU, ct1, ct2);
+	cout << "[GPU If] Duracion: " << durationGPU << " [ms]" << endl;
+
+	cudaEventRecord(ct1);
+	for (int i = 0; i < 1000; i++)
+	{
+		cudaMemset(devF1, 0, N*M * sizeof(int));
+		thirdTerWall << <gridSize, blockSize >> > (devF, devF1, N, M);
 		cudaDeviceSynchronize();
 		thirdFinalStep << <gridSize, blockSize >> > (devF, devF1, N, M);
 	}
@@ -269,6 +290,20 @@ int main() {
 	cudaEventRecord(ct2);
 	cudaEventSynchronize(ct2);
 	cudaEventElapsedTime(&durationGPU, ct1, ct2);
+	cout << "[GPU Ternario] Duracion: " << durationGPU << " [ms]" << endl;
+
+	cudaEventRecord(ct1);
+	for (int i = 0; i < 1000; i++)
+	{
+		cudaMemset(devF1, 0, N*M * sizeof(int));
+		thirdBoolWall << <gridSize, blockSize >> > (devF, devF1, N, M);
+		cudaDeviceSynchronize();
+		thirdFinalStep << <gridSize, blockSize >> > (devF, devF1, N, M);
+	}
+	cudaEventRecord(ct2);
+	cudaEventSynchronize(ct2);
+	cudaEventElapsedTime(&durationGPU, ct1, ct2);
+	cout << "[GPU Bool] Duracion: " << durationGPU << " [ms]" << endl;
 
 	cudaMemcpy(F, devF, N*M * sizeof(int), cudaMemcpyDeviceToHost);
 
@@ -287,7 +322,6 @@ int main() {
 	}
 
 	cout << "Cantidad de particulas: " << particles << endl;
-	cout << "[GPU] Duracion: " << durationGPU << " [ms]" << endl;
 
 	clock_t end = clock();
 	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
