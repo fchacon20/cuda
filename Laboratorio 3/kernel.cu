@@ -62,7 +62,24 @@ __global__ void kernelb(int *A, int*x, int*b, int N) {
 	}
 }
 
+extern __shared__ int red[];
 __global__ void kernelRed(int *A, int*x, int*b, int N) {
+	int tId = threadIdx.x + blockIdx.x * blockDim.x;
+	if (tId < N) {
+		int i = tId;
+		for (int j = 0; j < N; j++)
+			red[threadIdx.x] = x[j] * A[i*N + j];
+		__syncthreads();
+		for (int t = blockDim.x; t > 0; t /= 4)	{
+			if (threadIdx.x < t)
+				for (int k = 1; k < 4; k++)
+					red[threadIdx.x] += red[threadIdx.x + t*k];
+			__syncthreads();
+		}
+
+		if (threadIdx.x == 0)
+			atomicAdd(&b[i], red[0]);
+	}
 }
 
 __global__ void kernelSM(int *A, int*x, int*b, int N) {
@@ -146,6 +163,17 @@ int main() {
 		cout << B[i] << endl;
 	cout << endl;
 	
+	// KernelRed
+	int grid_sizeRed = (int)ceil((float)M / block_size);
+	kernelRed << <grid_sizeRed, block_size, block_size * sizeof(int) >> > (devA, devX, devB, M);
+	cudaMemcpy(B, devB, M * sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemset(devB, 0, N * sizeof(int));
+
+	cout << "KernelRed: " << endl;;
+	for (int i = 0; i < N; i++)
+		cout << B[i] << endl;
+	cout << endl;
+
 	// KernelCM
 	cudaMemcpyToSymbol(constX, X, M * sizeof(int), 0, cudaMemcpyHostToDevice);
 	int grid_sizeCM = (int)ceil((float)N / block_size);
