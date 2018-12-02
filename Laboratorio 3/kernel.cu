@@ -68,7 +68,16 @@ __global__ void kernelRed(int *A, int*x, int*b, int N) {
 __global__ void kernelSM(int *A, int*x, int*b, int N) {
 }
 
+__constant__ int constX[2];
 __global__ void kernelCM(int *A, int*b, int N) {
+	int tId = threadIdx.x + blockIdx.x * blockDim.x;
+	if (tId < N) {
+		int i = tId;
+		for (int j = 0; j < N; j++) {
+			int mult = constX[j] * A[j + i * N];
+			b[i] += mult;
+		}
+	}
 }
 
 void fillArray(int *a, int n) {
@@ -137,5 +146,24 @@ int main() {
 		cout << B[i] << endl;
 	cout << endl;
 	
+	// KernelCM
+	cudaMemcpyToSymbol(constX, X, M * sizeof(int), 0, cudaMemcpyHostToDevice);
+	int grid_sizeCM = (int)ceil((float)N / block_size);
+	kernelCM << <grid_sizeCM, block_size >> > (devA, devB, N);
+	cudaMemcpy(B, devB, N * sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemset(devB, 0, N * sizeof(int));
+
+	cout << "KernelCM: " << endl;;
+	for (int i = 0; i < N; i++)
+		cout << B[i] << endl;
+	cout << endl;
+
+	cudaFree(devA);
+	cudaFree(devX);
+	cudaFree(devB);
+	delete A;
+	delete X;
+	delete B;
+
 	return 0;
 }
