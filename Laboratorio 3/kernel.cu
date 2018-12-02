@@ -9,7 +9,7 @@ using namespace std;
 // consideraciones
 
 /*
-Se trabajar´a con una matriz cuadrada de 10^8 elementos, i.e. N = M = 10^4
+Se trabajarï¿½a con una matriz cuadrada de 10^8 elementos, i.e. N = M = 10^4
 
 El tamano de un bloque de hebras siempre sera 256.
 
@@ -23,8 +23,8 @@ comprobar si el resultado es correcto cuando todos los valores en b sean 10^4.
 
 __global__ void kernelA(int *A, int*x, int*b, int N) {
 	// Este kernel utiliza N x N = 10^8 hebras. Cada hebra esta asociada a un elemento a_i,j de la matriz A
-	// multiplicándolo por el valor x_j correspondiente y sumando este resultado al elemento en la i-ésima
-	// posición del vector b.
+	// multiplicï¿½ndolo por el valor x_j correspondiente y sumando este resultado al elemento en la i-ï¿½sima
+	// posiciï¿½n del vector b.
 	
 	int tId = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -83,6 +83,20 @@ __global__ void kernelRed(int *A, int*x, int*b, int N) {
 }
 
 __global__ void kernelSM(int *A, int*x, int*b, int N) {
+	int tId = threadIdx.x + blockIdx.x * blockDim.x;
+	if(tId < N){
+		int value = 0;
+		__shared__ int X[256];
+		for(int i = 0; i < N/256; i++){
+			for(int j = i*256; j < (i+1)*256; j++)
+				X[j % 256] = x[j];
+			__syncthreads();
+			for(int j = i*256; j < (i+1)*256; j++)
+				value += X[j % 256] * A[j + (tId * N)];
+			__syncthreads(); 
+		}
+		b[tId] = value;
+	}
 }
 
 __constant__ int constX[2];
@@ -170,6 +184,17 @@ int main() {
 	cudaMemset(devB, 0, N * sizeof(int));
 
 	cout << "KernelRed: " << endl;;
+	for (int i = 0; i < N; i++)
+		cout << B[i] << endl;
+	cout << endl;
+
+	// KernelSM
+	int grid_sizeSM = (int)ceil((float)M / block_size);
+	kernelSM << <grid_sizeSM, block_size>> > (devA, devX, devB, M);
+	cudaMemcpy(B, devB, M * sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemset(devB, 0, N * sizeof(int));
+
+	cout << "KernelSM: " << endl;;
 	for (int i = 0; i < N; i++)
 		cout << B[i] << endl;
 	cout << endl;
