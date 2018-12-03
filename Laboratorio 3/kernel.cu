@@ -63,18 +63,23 @@ __global__ void kernelb(int *A, int*x, int*b, int N) {
 }
 
 //extern __shared__ int red[];
+__shared__ int red[256];
 __global__ void kernelRed(int *A, int*x, int*b, int N) {
 	int tId = threadIdx.x + blockIdx.x * blockDim.x;
 	if (tId < N) {
-		__shared__ int red[256];
-		int j = tId;	
+		//__shared__ int red[256];
+		int j = tId;
 		for (int i = 0; i < N; i++) {
 			red[threadIdx.x] = x[j] * A[i*N + j];
 			__syncthreads();
 			for (int t = blockDim.x; t > 0; t /= 4) {
 				if (threadIdx.x < t)
-					for (int k = 1; k < 4; k++)
-						red[threadIdx.x] += red[threadIdx.x + t * k];
+					for (int k = 1; k < 4; k++) {
+						if (threadIdx.x < 256 && threadIdx.x + t*k < 256) {
+							red[threadIdx.x] += red[threadIdx.x + t * k];
+						}
+					}
+						
 				__syncthreads();
 			}
 
