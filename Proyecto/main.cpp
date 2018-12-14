@@ -40,6 +40,8 @@ int main() {
     double num = 1, den = 1;
     double frac, result = 0;
 
+
+    ///// Normal Lagrange Interpolation
     for (int k = 1; k <= m; ++k) {
         xn[k-1] = ((double)(b-a)/(m))*k;
         for (int i = 0; i < n; ++i) {
@@ -71,10 +73,55 @@ int main() {
     outfile2 << yn[m-1] << "\n";
     outfile2.close();
 
+    // -------------------------------------------------------- //
+
+    // Barycentric Lagrange Interpolation
+
+
+    // Reset variables 
+    double * weights = new double[n];
+    num = den = 0;
+
+    begin = clock();
+
+    for (int i = 0; i < n; i++){
+        weights[i] = 1;
+        for (int j = 0; j < n; j++){
+            if(i != j)
+                weights[i] *= (x[i] - x[j]);
+        }
+        weights[i] = (double)pow(weights[i], -1);
+    }
+
+    for (int i = 1; i <= m; i++) {
+        xn[i-1] = ((double)(b-a)/(m))*i;
+        for(int j = 0; j < n; j++){
+            num += (weights[j]/(xn[i-1] - x[j])) * y[j];
+            den += (weights[j]/(xn[i-1] - x[j]));
+        }
+        yn[i-1] = num / den;
+        num = den = 0;
+    }
+
+    end = clock();
+    time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
+    cout << "Tiempo de ejecucion Baricentrico: " << time_spent << " segundos" << endl;
+
+    // Saving output barycentric
+    ofstream outfile3("./baryOutput.txt");
+    for (int i = 0; i < m-1; ++i)
+        outfile3 << xn[i] << ",";
+    outfile3 << xn[m-1] << "\n";
+    for (int i = 0; i < m-1; ++i)
+        outfile3 << yn[i] << ",";
+    outfile3 << yn[m-1] << "\n";
+    outfile3.close();
+
     delete x;
     delete y;
     delete xn;
     delete yn;
+    delete weights;
 
     return 0;
 }
