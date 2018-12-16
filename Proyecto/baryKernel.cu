@@ -29,6 +29,7 @@ void calculateWeights(double * weights, float * x, int M){
     }
 }
 
+__constant__ double constantWeight[10000];
 __global__ void BaryKernel(const float * __restrict__ X, const float * __restrict__ Y, const float * __restrict__ N_x, 
                            const double* __restrict__ devWeights, float* N_y, int N, int M){
 
@@ -48,7 +49,7 @@ __global__ void BaryKernel(const float * __restrict__ X, const float * __restric
 
 int main(){
 
-    int N = 100000; // Cantidad de puntos a interpolar
+    int N = 10000; // Cantidad de puntos a interpolar
     int M = 30; // Cantidad de puntos a utilizar de la funci�n original
     double * weights = new double[M];
     cudaEvent_t ct1, ct2;
@@ -67,7 +68,8 @@ int main(){
     initialPoints(x, y, M);
     generateX(x_generados, N);
     calculateWeights(weights, x, M);
-    
+    cudaMemcpyToSymbol(constantWeight, weights, N * sizeof(double), 0, cudaMemcpyHostToDevice);
+
     // Saving input
 	//ofstream outfile("C:/Usuarios/Wil/Escritorio/Wil/initialPoints.txt");
 	ofstream outfile("./initialPoints.txt");
@@ -107,6 +109,14 @@ int main(){
     cout << "[GPU] Duration: " << dt << " [ms]" << endl;
 
     cudaMemcpy(y_generados, N_y, N * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaEventRecord(ct1);
+    BaryKernel << < grid_size, block_size >> > (X, Y, N_x, constantWeight, N_y, N, M);
+    cudaEventRecord(ct2);
+	cudaEventSynchronize(ct2);
+	cudaEventElapsedTime(&dt, ct1, ct2);
+
+    cout << "[GPU-Const] Duration: " << dt << " [ms]" << endl;
 
 	ofstream outfile2("./output.txt");
 	for (int i = 0; i < N - 1; ++i)
