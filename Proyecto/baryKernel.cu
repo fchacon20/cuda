@@ -29,7 +29,7 @@ void calculateWeights(double * weights, float * x, int M){
     }
 }
 
-__constant__ double constantWeight[10000];
+
 __global__ void BaryKernel(const float * __restrict__ X, const float * __restrict__ Y, const float * __restrict__ N_x, 
                            const double* __restrict__ devWeights, float* N_y, int N, int M){
 
@@ -47,6 +47,23 @@ __global__ void BaryKernel(const float * __restrict__ X, const float * __restric
     }
 }
 
+__constant__ double constantWeight[30];
+__global__ void ConsBaryKernel(const float * __restrict__ X, const float * __restrict__ Y, const float * __restrict__ N_x, 
+    const double* __restrict__ devWeights, float* N_y, int N, int M){
+
+    int tId = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if(tId < N){
+        double num = 0;
+        double den = 0;
+
+        for(int j = 0; j < N; j++){
+            num += (devWeights[j]/(N_x[tId] - X[j])) * Y[j];
+            den += (devWeights[j]/(N_x[tId] - X[j]));
+        }
+        N_y[tId] = num / den;
+    } 
+}
 int main(){
 
     int N = 10000; // Cantidad de puntos a interpolar
@@ -111,7 +128,7 @@ int main(){
     cudaMemcpy(y_generados, N_y, N * sizeof(float), cudaMemcpyDeviceToHost);
 
     cudaEventRecord(ct1);
-    BaryKernel << < grid_size, block_size >> > (X, Y, N_x, constantWeight, N_y, N, M);
+    ConsBaryKernel << < grid_size, block_size >> > (X, Y, N_x, constantWeight, N_y, N, M);
     cudaEventRecord(ct2);
 	cudaEventSynchronize(ct2);
 	cudaEventElapsedTime(&dt, ct1, ct2);
