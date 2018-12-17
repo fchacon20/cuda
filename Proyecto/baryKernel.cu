@@ -1,16 +1,23 @@
+#include <cmath>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
 
+#ifndef M_PI
+	#define M_PI 3.14159265358979323846
+#endif
+
 using namespace std;
 
-void initialPoints(float *x, float *y, int M) {
-	for (int i = 0; i < M; ++i) {
-        x[i] = i;
-		y[i] = 3 * x[i] + (float)pow(x[i], 2) + 1;
+void initialPoints(float *x, float *y, int M, int a, int b) {
+	
+	for (int i = 1; i <= M; ++i) {
+		x[i - 1] = (double)(a + b) / 2 + (double)(((b - a) / 2.0)*cos((2.0*i - 1.0)*M_PI / ((double)2.0*M)));
+		y[i - 1] = cos(x[i - 1]);
 	}
+
 }
 
 void generateX(float *x_generados, int N) {
@@ -67,6 +74,9 @@ int main(){
 
     int N = 1000000;	// Cantidad de puntos a interpolar
     int M = 30;			// Cantidad de puntos a utilizar de la funci�n original
+	int a = 0;
+	int b = 100;
+
     double * weights = new double[M];
     cudaEvent_t ct1, ct2, ct3, ct4;
     float dt, dt2;
@@ -83,7 +93,7 @@ int main(){
 	float *y_generados2 = new float[N];
 
 
-    initialPoints(x, y, M);
+    initialPoints(x, y, M, a, b);
     generateX(x_generados, N);
     calculateWeights(weights, x, M);
 

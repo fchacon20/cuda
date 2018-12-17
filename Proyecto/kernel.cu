@@ -1,16 +1,21 @@
+#include <cmath>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 using namespace std;
 
-void initialPoints(float *x, float *y, int n) {
+void initialPoints(float *x, float *y, int M, int a, int b) {
 
-	for (int i = 0; i < n; ++i) {
-		x[i] = i;
-		y[i] = 3 * x[i] + (float)pow(x[i], 2) + 1;
+	for (int i = 1; i <= M; ++i) {
+		x[i - 1] = (double)(a + b) / 2 + (double)(((b - a) / 2.0)*cos((2.0*i - 1.0)*M_PI / ((double)2.0*M)));
+		y[i - 1] = cos(x[i - 1]);
 	}
 
 }
@@ -54,6 +59,8 @@ __global__ void lagrange_uno(const float * __restrict__ X, const float * __restr
 int main() {
 	int N = 1000000; // Cantidad de puntos a interpolar
 	int M = 30; // Cantidad de puntos a utilizar de la función original
+	int a = 0;
+	int b = 100;
 
 	float *X, *Y;		// Arreglos conteniendo coordenadas X e Y de puntos de la función original
 	float *N_x, *N_y;	// Arreglos conteniendo coordenadas X e Y de puntos a interpolar.
@@ -64,7 +71,7 @@ int main() {
 	float *x_generados = new float[N];
 	float *y_generados = new float[N];
 	
-	initialPoints(x, y, M);
+	initialPoints(x, y, M, a, b);
 	generateX(x_generados, N);
 
 	// Saving input
