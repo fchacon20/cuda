@@ -34,7 +34,7 @@ __global__ void lagrange_uno(const float * __restrict__ X, const float * __restr
 
 		for (int i = 0; i < M; i++) {
 			prod = 1;
-			//if (tId == i) continue;
+			if (N_x[tId] == X[i]) continue;
 
 			for (int j = 0; j < M; j++) {
 				if (j == i) continue;
@@ -77,26 +77,35 @@ int main() {
 		outfile << y[i] << ",";
 	outfile << y[M - 1] << "\n";
 	outfile.close();
-	
-	cudaMalloc(&X, M * sizeof(float));
-	cudaMemcpy(X, x, M* sizeof(float), cudaMemcpyHostToDevice);
-
-	cudaMalloc(&Y, M * sizeof(float));
-	cudaMemcpy(Y, y, M * sizeof(float), cudaMemcpyHostToDevice);
-
-	cudaMalloc(&N_x, N * sizeof(float));
-	cudaMemcpy(N_x, x_generados, N * sizeof(float), cudaMemcpyHostToDevice);
-	
-	cudaMalloc(&N_y, N * sizeof(float));
 
 	int block_size = 256;
 	int grid_size = (int)ceil((float)N / block_size);
 
-	lagrange_uno << < grid_size, block_size >> > (X, Y, N_x, N_y, N, M);
+	cudaEvent_t ct1, ct2;
+	float dt;
 
+	cudaMalloc(&X, M * sizeof(float));
+	cudaMalloc(&Y, M * sizeof(float));
+	cudaMalloc(&N_x, N * sizeof(float));
+	cudaMalloc(&N_y, N * sizeof(float));
+
+	cudaEventCreate(&ct1);
+	cudaEventCreate(&ct2);
+	cudaEventRecord(ct1);
+
+	cudaMemcpy(X, x, M * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(Y, y, M * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(N_x, x_generados, N * sizeof(float), cudaMemcpyHostToDevice);
+
+	lagrange_uno << < grid_size, block_size >> > (X, Y, N_x, N_y, N, M);
 	cudaMemcpy(y_generados, N_y, N * sizeof(float), cudaMemcpyDeviceToHost);
 
-	//ofstream outfile2("C:/Usuarios/Wil/Escritorio/Wil/output.txt");
+	cudaEventRecord(ct2);
+	cudaEventSynchronize(ct2);
+	cudaEventElapsedTime(&dt, ct1, ct2);
+
+	cout << "[GPU] Duration: " << dt << " ms" << endl;
+
 	ofstream outfile2("./output.txt");
 	for (int i = 0; i < N - 1; ++i)
 		outfile2 << x_generados[i] << ",";
@@ -110,15 +119,11 @@ int main() {
 	cudaFree(Y);
 	cudaFree(N_x);
 	cudaFree(N_y);
-
 	
 	delete x;
 	delete y;
-
-	//delete x_generados;
-	//delete y_generados;
-	cout << "we did it bois" << endl;
-
+	delete x_generados;
+	delete y_generados;
 
 	return 0;
 }

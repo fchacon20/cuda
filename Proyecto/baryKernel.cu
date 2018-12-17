@@ -39,7 +39,7 @@ __global__ void BaryKernel(const float * __restrict__ X, const float * __restric
         double num = 0;
         double den = 0;
         
-        for(int j = 0; j < N; j++){
+        for(int j = 0; j < M; j++){
             num += (devWeights[j]/(N_x[tId] - X[j])) * Y[j];
             den += (devWeights[j]/(N_x[tId] - X[j]));
         }
@@ -48,8 +48,7 @@ __global__ void BaryKernel(const float * __restrict__ X, const float * __restric
 }
 
 __constant__ double constantWeight[30];
-__global__ void ConsBaryKernel(const float * __restrict__ X, const float * __restrict__ Y, const float * __restrict__ N_x, 
-    const double* __restrict__ devWeights, float* N_y, int N, int M){
+__global__ void ConsBaryKernel(const float * __restrict__ X, const float * __restrict__ Y, const float * __restrict__ N_x, float* N_y, int N, int M){
 
     int tId = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -57,38 +56,38 @@ __global__ void ConsBaryKernel(const float * __restrict__ X, const float * __res
         double num = 0;
         double den = 0;
 
-        for(int j = 0; j < N; j++){
-            num += (devWeights[j]/(N_x[tId] - X[j])) * Y[j];
-            den += (devWeights[j]/(N_x[tId] - X[j]));
+        for(int j = 0; j < M; j++){
+            num += (constantWeight[j]/(N_x[tId] - X[j])) * Y[j];
+            den += (constantWeight[j]/(N_x[tId] - X[j]));
         }
         N_y[tId] = num / den;
     } 
 }
 int main(){
 
-    int N = 10000; // Cantidad de puntos a interpolar
-    int M = 30; // Cantidad de puntos a utilizar de la funci�n original
+    int N = 1000000;	// Cantidad de puntos a interpolar
+    int M = 30;			// Cantidad de puntos a utilizar de la funci�n original
     double * weights = new double[M];
-    cudaEvent_t ct1, ct2;
-    float dt;
+    cudaEvent_t ct1, ct2, ct3, ct4;
+    float dt, dt2;
 
-	float *X, *Y;		// Arreglos conteniendo coordenadas X e Y de puntos de la funci�n original
-	float *N_x, *N_y;	// Arreglos conteniendo coordenadas X e Y de puntos a interpolar.
-						// N_x deben generarse, N_y deben calcularse usando el kernel
+	float *X, *X2, *Y, *Y2;			// Arreglos conteniendo coordenadas X e Y de puntos de la funci�n original
+	float *N_x, *N_x2, *N_y, *N_y2;	// Arreglos conteniendo coordenadas X e Y de puntos a interpolar.
+									// N_x deben generarse, N_y deben calcularse usando el kernel
     double *devWeights;
 
 	float *x = new float[M]; // coordenadas x de la funci�n
 	float *y = new float[M]; // coordenadas y de la funci�n
 	float *x_generados = new float[N];
     float *y_generados = new float[N];
+	float *y_generados2 = new float[N];
+
 
     initialPoints(x, y, M);
     generateX(x_generados, N);
     calculateWeights(weights, x, M);
-    cudaMemcpyToSymbol(constantWeight, weights, N * sizeof(double), 0, cudaMemcpyHostToDevice);
 
     // Saving input
-	//ofstream outfile("C:/Usuarios/Wil/Escritorio/Wil/initialPoints.txt");
 	ofstream outfile("./initialPoints.txt");
 	for (int i = 0; i < M - 1; ++i)
 		outfile << x[i] << ",";
@@ -96,44 +95,35 @@ int main(){
 	for (int i = 0; i < M - 1; ++i)
 		outfile << y[i] << ",";
 	outfile << y[M - 1] << "\n";
-    outfile.close();
-    
-    cudaMalloc(&X, M * sizeof(float));
-	cudaMemcpy(X, x, M* sizeof(float), cudaMemcpyHostToDevice);
-
-	cudaMalloc(&Y, M * sizeof(float));
-	cudaMemcpy(Y, y, M * sizeof(float), cudaMemcpyHostToDevice);
-
-	cudaMalloc(&devWeights, M * sizeof(double));
-    cudaMemcpy(devWeights, weights, M * sizeof(float), cudaMemcpyHostToDevice);
-
-    cudaMalloc(&N_x, N * sizeof(float));
-	cudaMemcpy(N_x, x_generados, N * sizeof(float), cudaMemcpyHostToDevice);
-	
-    cudaMalloc(&N_y, N * sizeof(float));
+	outfile.close();
     
     int block_size = 256;
     int grid_size = (int)ceil((float)N / block_size);
 
-    cudaEventCreate(&ct1);
+	cudaMalloc(&X, M * sizeof(float));
+	cudaMalloc(&Y, M * sizeof(float));
+	cudaMalloc(&devWeights, M * sizeof(double));
+	cudaMalloc(&N_x, N * sizeof(float));
+	cudaMalloc(&N_y, N * sizeof(float));
+
+	cudaEventCreate(&ct1);
 	cudaEventCreate(&ct2);
 	cudaEventRecord(ct1);
+
+	cudaMemcpy(X, x, M * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(Y, y, M * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(devWeights, weights, M * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(N_x, x_generados, N * sizeof(float), cudaMemcpyHostToDevice);
+
     BaryKernel << < grid_size, block_size >> > (X, Y, N_x, devWeights, N_y, N, M);
+
+	cudaMemcpy(y_generados, N_y, N * sizeof(float), cudaMemcpyDeviceToHost);
+
     cudaEventRecord(ct2);
 	cudaEventSynchronize(ct2);
 	cudaEventElapsedTime(&dt, ct1, ct2);
 
     cout << "[GPU] Duration: " << dt << " [ms]" << endl;
-
-    cudaMemcpy(y_generados, N_y, N * sizeof(float), cudaMemcpyDeviceToHost);
-
-    cudaEventRecord(ct1);
-    ConsBaryKernel << < grid_size, block_size >> > (X, Y, N_x, constantWeight, N_y, N, M);
-    cudaEventRecord(ct2);
-	cudaEventSynchronize(ct2);
-	cudaEventElapsedTime(&dt, ct1, ct2);
-
-    cout << "[GPU-Const] Duration: " << dt << " [ms]" << endl;
 
 	ofstream outfile2("./output.txt");
 	for (int i = 0; i < N - 1; ++i)
@@ -142,18 +132,60 @@ int main(){
 	for (int i = 0; i < N - 1; ++i)
 		outfile2 << y_generados[i] << ",";
 	outfile2 << y_generados[N - 1] << "\n";
-    outfile2.close();
-    
-    cudaFree(X);
+	outfile2.close();
+
+	cudaFree(X);
 	cudaFree(Y);
 	cudaFree(N_x);
 	cudaFree(N_y);
+	cudaFree(devWeights);
+
+
+	cudaMalloc(&X2, M * sizeof(float));
+	cudaMalloc(&Y2, M * sizeof(float));
+	cudaMalloc(&N_x2, N * sizeof(float));
+	cudaMalloc(&N_y2, N * sizeof(float));
+
+	cudaEventCreate(&ct3);
+	cudaEventCreate(&ct4);
+	cudaEventRecord(ct3);
+
+	cudaMemcpy(X2, x, M * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(Y2, y, M * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpyToSymbol(constantWeight, weights, M * sizeof(double), 0, cudaMemcpyHostToDevice);
+	cudaMemcpy(N_x2, x_generados, N * sizeof(float), cudaMemcpyHostToDevice);
+
+
+    ConsBaryKernel << < grid_size, block_size >> > (X2, Y2, N_x2, N_y2, N, M);
+
+	cudaMemcpy(y_generados2, N_y2, N * sizeof(float), cudaMemcpyDeviceToHost);
+
+	cudaEventRecord(ct4);
+	cudaEventSynchronize(ct4);
+	cudaEventElapsedTime(&dt2, ct3, ct4);
+
+    cout << "[GPU-Const] Duration: " << dt2 << " [ms]" << endl;
+
+	ofstream outfile3("./output_const.txt");
+	for (int i = 0; i < N - 1; ++i)
+		outfile3 << x_generados[i] << ",";
+	outfile3 << x_generados[N - 1] << "\n";
+	for (int i = 0; i < N - 1; ++i)
+		outfile3 << y_generados2[i] << ",";
+	outfile3 << y_generados2[N - 1] << "\n";
+    outfile3.close();
+    
+    cudaFree(X2);
+	cudaFree(Y2);
+	cudaFree(N_x2);
+	cudaFree(N_y2);
 	
 	delete x;
     delete y;
     delete weights;
     delete x_generados;
     delete y_generados;
+	delete y_generados2;
     
     return 0;
 }
