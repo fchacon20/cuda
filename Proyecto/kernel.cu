@@ -47,16 +47,16 @@ __global__ void lagrange_uno(const float * __restrict__ X, const float * __restr
 
 int main() {
 	int N = 1000000; // Cantidad de puntos a interpolar
-	int M = 30; // Cantidad de puntos a utilizar de la función original
+	int M = 30; // Cantidad de puntos a utilizar de la funciï¿½n original
 	int a = 0;
 	int b = 100;
 
-	float *X, *Y;		// Arreglos conteniendo coordenadas X e Y de puntos de la función original
+	float *X, *Y;		// Arreglos conteniendo coordenadas X e Y de puntos de la funciï¿½n original
 	float *N_x, *N_y;	// Arreglos conteniendo coordenadas X e Y de puntos a interpolar.
 						// N_x deben generarse, N_y deben calcularse usando el kernel
 
-	float *x = new float[M]; // coordenadas x de la función
-	float *y = new float[M]; // coordenadas y de la función
+	float *x = new float[M]; // coordenadas x de la funciï¿½n
+	float *y = new float[M]; // coordenadas y de la funciï¿½n
 	float *x_generados = new float[N];
 	float *y_generados = new float[N];
 	

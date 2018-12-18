@@ -15,8 +15,7 @@ void initialPoints(float *x, float *y, int M, int a, int b) {
 	
 	for (int i = 1; i <= M; ++i) {
 		x[i - 1] = (double)(a + b) / 2 + (double)(((b - a) / 2.0)*cos((2.0*i - 1.0)*M_PI / ((double)2.0*M)));
-		//y[i - 1] = cos(x[i - 1]);
-		y[i - 1] = pow((x[i - 1]-40), 3) + pow(x[i - 1], 2) + pow(x[i - 1], -1);
+		y[i - 1] = cos(x[i - 1]);
 	}
 
 }
@@ -50,7 +49,7 @@ __global__ void BaryKernel(const float * __restrict__ X, const float * __restric
         for(int j = 0; j < M; j++){
         	if (N_x[tId] == X[j]){
         		N_y[tId] = Y[j];
-        		continue;
+        		return;
         	}
             num += (devWeights[j]/(N_x[tId] - X[j])) * Y[j];
             den += (devWeights[j]/(N_x[tId] - X[j]));
@@ -71,7 +70,7 @@ __global__ void ConsBaryKernel(const float * __restrict__ X, const float * __res
         for(int j = 0; j < M; j++){
         	if (N_x[tId] == X[j]){
         		N_y[tId] = Y[j];
-        		continue;
+        		return;
         	}
             num += (constantWeight[j]/(N_x[tId] - X[j])) * Y[j];
             den += (constantWeight[j]/(N_x[tId] - X[j]));
