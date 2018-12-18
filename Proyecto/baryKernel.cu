@@ -15,14 +15,15 @@ void initialPoints(float *x, float *y, int M, int a, int b) {
 	
 	for (int i = 1; i <= M; ++i) {
 		x[i - 1] = (double)(a + b) / 2 + (double)(((b - a) / 2.0)*cos((2.0*i - 1.0)*M_PI / ((double)2.0*M)));
-		y[i - 1] = cos(x[i - 1]);
+		//y[i - 1] = cos(x[i - 1]);
+		y[i - 1] = pow((x[i - 1]-40), 3) + pow(x[i - 1], 2) + pow(x[i - 1], -1);
 	}
 
 }
 
 void generateX(float *x_generados, int N, int a, int b) {
 	for (int i = 1; i <= N; ++i)
-		x_generados[i-1] = ((float) (b-a)/(n)*i);
+		x_generados[i-1] = ((float) (b-a)/(N)*i);
 }
 
 void calculateWeights(double * weights, float * x, int M){
@@ -47,6 +48,10 @@ __global__ void BaryKernel(const float * __restrict__ X, const float * __restric
         double den = 0;
         
         for(int j = 0; j < M; j++){
+        	if (N_x[tId] == X[j]){
+        		N_y[tId] = Y[j];
+        		continue;
+        	}
             num += (devWeights[j]/(N_x[tId] - X[j])) * Y[j];
             den += (devWeights[j]/(N_x[tId] - X[j]));
         }
@@ -64,6 +69,10 @@ __global__ void ConsBaryKernel(const float * __restrict__ X, const float * __res
         double den = 0;
 
         for(int j = 0; j < M; j++){
+        	if (N_x[tId] == X[j]){
+        		N_y[tId] = Y[j];
+        		continue;
+        	}
             num += (constantWeight[j]/(N_x[tId] - X[j])) * Y[j];
             den += (constantWeight[j]/(N_x[tId] - X[j]));
         }
@@ -122,7 +131,7 @@ int main(){
 
 	cudaMemcpy(X, x, M * sizeof(float), cudaMemcpyHostToDevice);
 	cudaMemcpy(Y, y, M * sizeof(float), cudaMemcpyHostToDevice);
-	cudaMemcpy(devWeights, weights, M * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(devWeights, weights, M * sizeof(double), cudaMemcpyHostToDevice);
 	cudaMemcpy(N_x, x_generados, N * sizeof(float), cudaMemcpyHostToDevice);
 
     BaryKernel << < grid_size, block_size >> > (X, Y, N_x, devWeights, N_y, N, M);

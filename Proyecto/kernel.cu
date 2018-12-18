@@ -12,48 +12,37 @@
 using namespace std;
 
 void initialPoints(float *x, float *y, int M, int a, int b) {
-
 	for (int i = 1; i <= M; ++i) {
 		x[i - 1] = (double)(a + b) / 2 + (double)(((b - a) / 2.0)*cos((2.0*i - 1.0)*M_PI / ((double)2.0*M)));
 		y[i - 1] = cos(x[i - 1]);
 	}
-
 }
 
 void generateX(float *x, int n, int a, int b) {
-
 	for (int i = 1; i <= n; ++i) {
 		x[i-1] = ((float)(b-a)/(n))*i;
 	}
-
 }
 
-__global__ void lagrange_uno(const float * __restrict__ X, const float * __restrict__ Y, const float * __restrict__ N_x, float* N_y, int N, int M) {
-
+__global__ void lagrange_uno(const float * __restrict__ X, const float * __restrict__ Y,
+							 const float * __restrict__ N_x, float* N_y, int N, int M) {
 	int tId = threadIdx.x + blockIdx.x * blockDim.x;
 
 	if (tId < N) {
-
 		float sum = 0;
 		float prod;
 
 		for (int i = 0; i < M; i++) {
 			prod = 1;
 			if (N_x[tId] == X[i]) continue;
-
 			for (int j = 0; j < M; j++) {
 				if (j == i) continue;
-				prod = prod * (N_x[tId] - X[i]) / (X[j] - X[i]);
+				prod = prod * (N_x[tId] - X[j]) / (X[i] - X[j]);
 			}
-
 			sum = sum + prod * Y[i];
 		}
-
-		// escribir valor de y al arreglo
 		N_y[tId] = sum;
-
 	}
-
 }
 
 int main() {
