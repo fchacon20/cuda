@@ -20,7 +20,7 @@ void initialPoints(float *x, float *y, int M, int a, int b) {
 
 }
 
-void generateX(float *x_generados, int N) {
+void generateX(float *x_generados, int N, int a, int b) {
 	for (int i = 1; i <= N; ++i)
 		x_generados[i-1] = ((float) (b-a)/(n)*i);
 }
@@ -94,7 +94,7 @@ int main(){
 
 
     initialPoints(x, y, M, a, b);
-    generateX(x_generados, N);
+    generateX(x_generados, N, a, b);
     calculateWeights(weights, x, M);
 
     // Saving input
