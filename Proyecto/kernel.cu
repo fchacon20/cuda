@@ -20,10 +20,10 @@ void initialPoints(float *x, float *y, int M, int a, int b) {
 
 }
 
-void generateX(float *x, int n) {
+void generateX(float *x, int n, int a, int b) {
 
 	for (int i = 1; i <= n; ++i) {
-		x[i] = (float) 0.00003*i;
+		x[i-1] = ((float)(b-a)/(n))*i;
 	}
 
 }
@@ -72,7 +72,7 @@ int main() {
 	float *y_generados = new float[N];
 	
 	initialPoints(x, y, M, a, b);
-	generateX(x_generados, N);
+	generateX(x_generados, N, a, b);
 
 	// Saving input
 	//ofstream outfile("C:/Usuarios/Wil/Escritorio/Wil/initialPoints.txt");

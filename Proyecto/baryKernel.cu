@@ -22,7 +22,7 @@ void initialPoints(float *x, float *y, int M, int a, int b) {
 
 void generateX(float *x_generados, int N) {
 	for (int i = 1; i <= N; ++i)
-		x_generados[i-1] = (float) 0.00003*i;
+		x_generados[i-1] = ((float) (b-a)/(n)*i);
 }
 
 void calculateWeights(double * weights, float * x, int M){
